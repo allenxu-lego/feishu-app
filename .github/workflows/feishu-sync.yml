@@ -43,6 +43,9 @@ jobs:
         env:
           FS_APP_ID: ${{ secrets.FS_APP_ID }}
           FS_APP_SECRET: ${{ secrets.FS_APP_SECRET }}
+          BITABLE_APP_TOKEN: ${{ secrets.BITABLE_APP_TOKEN }}
+          PROJECT_TABLE_ID: ${{ secrets.PROJECT_TABLE_ID }}
+          CAPABILITY_TABLE_ID: ${{ secrets.CAPABILITY_TABLE_ID }}
         run: node scripts/feishu_sync.js
 
       - name: Upload Pages artifact
