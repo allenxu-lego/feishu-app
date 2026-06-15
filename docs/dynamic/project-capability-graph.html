@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Project & Capability Knowledge Graph</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0a0e1a;color:#e0e6f0;overflow:hidden;height:100vh;width:100vw}
+.header{position:fixed;top:0;left:0;right:0;z-index:100;background:linear-gradient(180deg,rgba(10,14,26,0.98) 0%,rgba(10,14,26,0.85) 80%,transparent 100%);padding:16px 28px 28px;display:flex;align-items:flex-start;justify-content:space-between}
+.header h1{font-size:20px;font-weight:600;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header .sub{font-size:12px;color:#64748b;margin-top:2px}
+.legend{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8}
+.legend-dot{width:12px;height:12px;border-radius:50%;border:2px solid}
+.controls{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:100;display:flex;gap:8px;background:rgba(15,20,35,0.9);border:1px solid rgba(100,116,139,0.2);border-radius:12px;padding:8px 12px;backdrop-filter:blur(12px)}
+.controls button{background:rgba(100,116,139,0.15);border:1px solid rgba(100,116,139,0.2);color:#94a3b8;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;transition:all 0.2s}
+.controls button:hover{background:rgba(96,165,250,0.2);color:#60a5fa;border-color:rgba(96,165,250,0.3)}
+.controls button.active{background:rgba(96,165,250,0.25);color:#60a5fa;border-color:#60a5fa}
+.filter-bar{position:fixed;top:70px;left:28px;z-index:100;display:flex;gap:6px;flex-wrap:wrap;max-width:500px}
+.filter-chip{padding:4px 12px;border-radius:20px;font-size:11px;cursor:pointer;transition:all 0.2s;border:1px solid}
+.detail-panel{position:fixed;top:0;right:-420px;width:400px;height:100vh;background:rgba(12,16,30,0.97);border-left:1px solid rgba(100,116,139,0.2);z-index:200;transition:right 0.35s cubic-bezier(0.4,0,0.2,1);overflow-y:auto;backdrop-filter:blur(20px)}
+.detail-panel.open{right:0}
+.detail-panel .close-btn{position:absolute;top:16px;right:16px;background:rgba(100,116,139,0.15);border:none;color:#94a3b8;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center}
+.detail-panel .close-btn:hover{background:rgba(239,68,68,0.2);color:#f87171}
+.detail-header{padding:28px 28px 20px;border-bottom:1px solid rgba(100,116,139,0.15)}
+.detail-header .type-badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px}
+.detail-header h2{font-size:18px;font-weight:600;color:#f1f5f9;line-height:1.3}
+.detail-body{padding:20px 28px 28px}
+.detail-row{margin-bottom:16px}
+.detail-row .label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#64748b;margin-bottom:4px}
+.detail-row .value{font-size:13px;color:#cbd5e1;line-height:1.5;word-break:break-word}
+.detail-row .value.empty{color:#475569;font-style:italic}
+.related-section{margin-top:20px;padding-top:20px;border-top:1px solid rgba(100,116,139,0.15)}
+.related-section h3{font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px}
+.related-chip{display:inline-block;padding:4px 10px;border-radius:8px;font-size:12px;margin:2px 4px 2px 0;cursor:pointer;transition:all 0.2s;border:1px solid rgba(100,116,139,0.2)}
+.related-chip:hover{transform:translateY(-1px)}
+svg{width:100%;height:100%}
+.tooltip{position:fixed;padding:8px 14px;background:rgba(15,20,40,0.95);border:1px solid rgba(100,116,139,0.3);border-radius:8px;font-size:12px;color:#e0e6f0;pointer-events:none;z-index:300;max-width:280px;backdrop-filter:blur(8px);opacity:0;transition:opacity 0.15s}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Project & Capability Knowledge Graph</h1>
+    <div class="sub">Drag nodes to rearrange · Click nodes for details · Scroll to zoom</div>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(16,185,129,0.2);border-color:#10b981"></div>Domain</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(245,158,11,0.2);border-color:#f59e0b"></div>Digital Owner</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(96,165,250,0.2);border-color:#60a5fa"></div>Project</div>
+    <div class="legend-item"><div class="legend-dot" style="background:rgba(167,139,250,0.2);border-color:#a78bfa"></div>Capability</div>
+  </div>
+</div>
+<div class="filter-bar" id="filterBar"></div>
+<div class="detail-panel" id="detailPanel">
+  <button class="close-btn" id="closeBtn">&times;</button>
+  <div id="detailContent"></div>
+</div>
+<div class="controls">
+  <button id="btnReset">Reset View</button>
+  <button id="btnLabels" class="active">Labels</button>
+  <button id="btn_category" data-type="category">Domain</button>
+  <button id="btn_person" data-type="person">Digital Owner</button>
+  <button id="btn_item" data-type="item">Project</button>
+  <button id="btn_tag" data-type="tag">Capability</button>
+  <button id="btnAll">Show All</button>
+</div>
+<div class="tooltip" id="tooltip"></div>
+<svg id="graph" style="position:fixed;top:0;left:0;width:100vw;height:100vh"></svg>
+
+<script id="graph-data" type="application/json">
+{"nodes":[{"id":"domain:RetailExcellence","type":"category","label":"RetailExcellence"},{"id":"domain:OmniCom","type":"category","label":"OmniCom"},{"id":"domain:OmniHub","type":"category","label":"OmniHub"},{"id":"domain:CX","type":"category","label":"CX"},{"id":"domain:CE","type":"category","label":"CE"},{"id":"domain:ME","type":"category","label":"ME"},{"id":"owner:RainyGuo","type":"person","label":"RainyGuo"},{"id":"owner:Dachuan Li","type":"person","label":"Dachuan Li"},{"id":"owner:Lorraine Song","type":"person","label":"Lorraine Song"},{"id":"owner:Lorraine Song ","type":"person","label":"Lorraine Song "},{"id":"owner:Sarah Si","type":"person","label":"Sarah Si"},{"id":"owner:Abbey Wang","type":"person","label":"Abbey Wang"},{"id":"owner:Elaine Zhuo","type":"person","label":"Elaine Zhuo"},{"id":"project:PR001","type":"item","label":"Talkie-Voice Memo","shortId":"PR001"},{"id":"project:PR018","type":"item","label":"HR Talent Acquisition Agent POC","shortId":"PR018"},{"id":"project:PR019","type":"item","label":"AI Shopper Analyzer POC","shortId":"PR019"},{"id":"project:PR020","type":"item","label":"AI Coaching","shortId":"PR020"},{"id":"project:PR021","type":"item","label":"Whatsapp/Line– Asset libary","shortId":"PR021"},{"id":"project:PR027","type":"item","label":"Talkie - Image Identification","shortId":"PR027"},{"id":"project:PR002","type":"item","label":"One Coach Phase 1","shortId":"PR002"},{"id":"project:PR010","type":"item","label":"Omni Hub Platform","shortId":"PR010"},{"id":"project:PR011","type":"item","label":"Kate Spade OMS revamp","shortId":"PR011"},{"id":"project:PR012","type":"item","label":"Coach TW Omni Hub","shortId":"PR012"},{"id":"project:PR017","type":"item","label":"Experience Hub Phase 1 ","shortId":"PR017"},{"id":"project:PR004","type":"item","label":"Experience Hub Phase 2 - Design","shortId":"PR004"},{"id":"project:PR005","type":"item","label":"City Compass - Foundation","shortId":"PR005"},{"id":"project:PR006","type":"item","label":"City Compass - Assessment","shortId":"PR006"},{"id":"project:PR007","type":"item","label":"City Compass - Lease AI POC","shortId":"PR007"},{"id":"project:PR008","type":"item","label":"B2B Client Portal","shortId":"PR008"},{"id":"project:PR009","type":"item","label":"One CS Hub","shortId":"PR009"},{"id":"project:PR022","type":"item","label":"CGE","shortId":"PR022"},{"id":"project:PR023","type":"item","label":"Recommendation Studio","shortId":"PR023"},{"id":"project:PR024","type":"item","label":"C360","shortId":"PR024"},{"id":"project:PR025","type":"item","label":"DTC Performance Marketing Tracking","shortId":"PR025"},{"id":"project:PR033","type":"item","label":"TW Loyalty Revamp","shortId":"PR033"},{"id":"project:PR028","type":"item","label":"Trading Desk Phase II","shortId":"PR028"},{"id":"project:PR029","type":"item","label":"City Tracking AI Interpreter","shortId":"PR029"},{"id":"project:PR030","type":"item","label":"MZ Media Data performance tracking dashboard","shortId":"PR030"},{"id":"project:PR036","type":"item","label":"AEO/GEO POC","shortId":"PR036"},{"id":"project:PR037","type":"item","label":"CORED Phase II","shortId":"PR037"},{"id":"capability:C019","type":"tag","label":"C019","shortId":"C019"},{"id":"capability:C020","type":"tag","label":"C020","shortId":"C020"},{"id":"capability:C004","type":"tag","label":"C004","shortId":"C004"},{"id":"capability:C003","type":"tag","label":"C003","shortId":"C003"},{"id":"capability:C010","type":"tag","label":"C010","shortId":"C010"},{"id":"capability:C015","type":"tag","label":"C015","shortId":"C015"},{"id":"capability:C002","type":"tag","label":"C002","shortId":"C002"},{"id":"capability:C013","type":"tag","label":"C013","shortId":"C013"},{"id":"capability:C014","type":"tag","label":"C014","shortId":"C014"},{"id":"capability:C008","type":"tag","label":"C008","shortId":"C008"},{"id":"capability:C018","type":"tag","label":"C018","shortId":"C018"},{"id":"capability:C023","type":"tag","label":"C023","shortId":"C023"},{"id":"capability:C024","type":"tag","label":"C024","shortId":"C024"},{"id":"capability:C025","type":"tag","label":"C025","shortId":"C025"},{"id":"capability:C026","type":"tag","label":"C026","shortId":"C026"},{"id":"capability:C005","type":"tag","label":"C005","shortId":"C005"},{"id":"capability:C022","type":"tag","label":"C022","shortId":"C022"},{"id":"capability:C012","type":"tag","label":"C012","shortId":"C012"},{"id":"capability:C016","type":"tag","label":"C016","shortId":"C016"},{"id":"capability:C009","type":"tag","label":"C009","shortId":"C009"},{"id":"capability:C007","type":"tag","label":"C007","shortId":"C007"},{"id":"capability:C017","type":"tag","label":"C017","shortId":"C017"},{"id":"capability:C029","type":"tag","label":"C029","shortId":"C029"},{"id":"capability:C030","type":"tag","label":"C030","shortId":"C030"},{"id":"capability:C001","type":"tag","label":"C001","shortId":"C001"},{"id":"capability:C011","type":"tag","label":"C011","shortId":"C011"},{"id":"capability:C021","type":"tag","label":"C021","shortId":"C021"},{"id":"capability:C006","type":"tag","label":"C006","shortId":"C006"},{"id":"capability:C031","type":"tag","label":"C031","shortId":"C031"}],"edges":[{"source":"project:PR001","target":"domain:RetailExcellence","type":"belongs_to_domain"},{"source":"project:PR001","target":"capability:C020","type":"has_capability"},{"source":"project:PR018","target":"domain:RetailExcellence","type":"belongs_to_domain"},{"source":"project:PR018","target":"capability:C004","type":"has_capability"},{"source":"project:PR019","target":"domain:RetailExcellence","type":"belongs_to_domain"},{"source":"project:PR019","target":"capability:C015","type":"has_capability"},{"source":"project:PR020","target":"domain:RetailExcellence","type":"belongs_to_domain"},{"source":"project:PR020","target":"capability:C003","type":"has_capability"},{"source":"project:PR021","target":"domain:RetailExcellence","type":"belongs_to_domain"},{"source":"project:PR021","target":"capability:C010","type":"has_capability"},{"source":"project:PR027","target":"domain:RetailExcellence","type":"belongs_to_domain"},{"source":"project:PR027","target":"capability:C019","type":"has_capability"},{"source":"project:PR002","target":"domain:OmniCom","type":"belongs_to_domain"},{"source":"project:PR002","target":"capability:C013","type":"has_capability"},{"source":"project:PR010","target":"domain:OmniHub","type":"belongs_to_domain"},{"source":"project:PR010","target":"capability:C025","type":"has_capability"},{"source":"project:PR011","target":"domain:OmniHub","type":"belongs_to_domain"},{"source":"project:PR011","target":"capability:C023","type":"has_capability"},{"source":"project:PR012","target":"domain:OmniHub","type":"belongs_to_domain"},{"source":"project:PR012","target":"capability:C024","type":"has_capability"},{"source":"project:PR017","target":"domain:CX","type":"belongs_to_domain"},{"source":"project:PR017","target":"capability:C009","type":"has_capability"},{"source":"project:PR004","target":"domain:CX","type":"belongs_to_domain"},{"source":"project:PR005","target":"domain:CX","type":"belongs_to_domain"},{"source":"project:PR005","target":"capability:C005","type":"has_capability"},{"source":"project:PR006","target":"domain:CX","type":"belongs_to_domain"},{"source":"project:PR006","target":"capability:C005","type":"has_capability"},{"source":"project:PR007","target":"domain:CX","type":"belongs_to_domain"},{"source":"project:PR007","target":"capability:C005","type":"has_capability"},{"source":"project:PR008","target":"domain:CX","type":"belongs_to_domain"},{"source":"project:PR008","target":"capability:C022","type":"has_capability"},{"source":"project:PR009","target":"domain:CX","type":"belongs_to_domain"},{"source":"project:PR009","target":"capability:C012","type":"has_capability"},{"source":"project:PR022","target":"domain:CE","type":"belongs_to_domain"},{"source":"project:PR022","target":"capability:C029","type":"has_capability"},{"source":"project:PR023","target":"domain:CE","type":"belongs_to_domain"},{"source":"project:PR023","target":"capability:C007","type":"has_capability"},{"source":"project:PR024","target":"domain:CE","type":"belongs_to_domain"},{"source":"project:PR024","target":"capability:C030","type":"has_capability"},{"source":"project:PR025","target":"domain:CE","type":"belongs_to_domain"},{"source":"project:PR025","target":"capability:C007","type":"has_capability"},{"source":"project:PR033","target":"domain:CE","type":"belongs_to_domain"},{"source":"project:PR033","target":"capability:C017","type":"has_capability"},{"source":"project:PR028","target":"domain:ME","type":"belongs_to_domain"},{"source":"project:PR028","target":"capability:C021","type":"has_capability"},{"source":"project:PR029","target":"domain:ME","type":"belongs_to_domain"},{"source":"project:PR029","target":"capability:C006","type":"has_capability"},{"source":"project:PR030","target":"domain:ME","type":"belongs_to_domain"},{"source":"project:PR030","target":"capability:C011","type":"has_capability"},{"source":"project:PR036","target":"domain:ME","type":"belongs_to_domain"},{"source":"project:PR036","target":"capability:C001","type":"has_capability"},{"source":"project:PR037","target":"domain:ME","type":"belongs_to_domain"},{"source":"project:PR037","target":"capability:C031","type":"has_capability"},{"source":"capability:C019","target":"domain:RetailExcellence","type":"belongs_to_domain"},{"source":"capability:C019","target":"owner:RainyGuo","type":"owned_by"},{"source":"capability:C020","target":"domain:RetailExcellence","type":"belongs_to_domain"},{"source":"capability:C020","target":"owner:RainyGuo","type":"owned_by"},{"source":"capability:C004","target":"domain:RetailExcellence","type":"belongs_to_domain"},{"source":"capability:C004","target":"owner:RainyGuo","type":"owned_by"},{"source":"capability:C003","target":"domain:RetailExcellence","type":"belongs_to_domain"},{"source":"capability:C003","target":"owner:RainyGuo","type":"owned_by"},{"source":"capability:C010","target":"domain:RetailExcellence","type":"belongs_to_domain"},{"source":"capability:C010","target":"owner:RainyGuo","type":"owned_by"},{"source":"capability:C015","target":"domain:RetailExcellence","type":"belongs_to_domain"},{"source":"capability:C015","target":"owner:RainyGuo","type":"owned_by"},{"source":"capability:C002","target":"domain:OmniCom","type":"belongs_to_domain"},{"source":"capability:C002","target":"owner:Dachuan Li","type":"owned_by"},{"source":"capability:C013","target":"domain:OmniCom","type":"belongs_to_domain"},{"source":"capability:C013","target":"owner:Dachuan Li","type":"owned_by"},{"source":"capability:C014","target":"domain:OmniCom","type":"belongs_to_domain"},{"source":"capability:C014","target":"owner:Dachuan Li","type":"owned_by"},{"source":"capability:C008","target":"domain:OmniCom","type":"belongs_to_domain"},{"source":"capability:C008","target":"owner:Dachuan Li","type":"owned_by"},{"source":"capability:C018","target":"domain:OmniCom","type":"belongs_to_domain"},{"source":"capability:C018","target":"owner:Dachuan Li","type":"owned_by"},{"source":"capability:C023","target":"domain:OmniHub","type":"belongs_to_domain"},{"source":"capability:C024","target":"domain:OmniHub","type":"belongs_to_domain"},{"source":"capability:C025","target":"domain:OmniHub","type":"belongs_to_domain"},{"source":"capability:C026","target":"domain:OmniHub","type":"belongs_to_domain"},{"source":"capability:C005","target":"domain:CX","type":"belongs_to_domain"},{"source":"capability:C005","target":"owner:Lorraine Song","type":"owned_by"},{"source":"capability:C022","target":"domain:CX","type":"belongs_to_domain"},{"source":"capability:C022","target":"owner:Lorraine Song ","type":"owned_by"},{"source":"capability:C012","target":"domain:CX","type":"belongs_to_domain"},{"source":"capability:C012","target":"owner:Lorraine Song ","type":"owned_by"},{"source":"capability:C016","target":"domain:CX","type":"belongs_to_domain"},{"source":"capability:C016","target":"owner:Lorraine Song ","type":"owned_by"},{"source":"capability:C009","target":"domain:CX","type":"belongs_to_domain"},{"source":"capability:C009","target":"owner:Lorraine Song ","type":"owned_by"},{"source":"capability:C007","target":"domain:CE","type":"belongs_to_domain"},{"source":"capability:C007","target":"owner:Sarah Si","type":"owned_by"},{"source":"capability:C017","target":"domain:CE","type":"belongs_to_domain"},{"source":"capability:C017","target":"owner:Sarah Si","type":"owned_by"},{"source":"capability:C029","target":"domain:CE","type":"belongs_to_domain"},{"source":"capability:C029","target":"owner:Sarah Si","type":"owned_by"},{"source":"capability:C030","target":"domain:CE","type":"belongs_to_domain"},{"source":"capability:C030","target":"owner:Sarah Si","type":"owned_by"},{"source":"capability:C001","target":"domain:ME","type":"belongs_to_domain"},{"source":"capability:C001","target":"owner:Abbey Wang","type":"owned_by"},{"source":"capability:C011","target":"domain:ME","type":"belongs_to_domain"},{"source":"capability:C011","target":"owner:Elaine Zhuo","type":"owned_by"},{"source":"capability:C021","target":"domain:ME","type":"belongs_to_domain"},{"source":"capability:C021","target":"owner:Elaine Zhuo","type":"owned_by"},{"source":"capability:C006","target":"domain:ME","type":"belongs_to_domain"},{"source":"capability:C006","target":"owner:Elaine Zhuo","type":"owned_by"},{"source":"capability:C031","target":"domain:ME","type":"belongs_to_domain"},{"source":"capability:C031","target":"owner:Abbey Wang","type":"owned_by"}],"details":{"domain:RetailExcellence":{"Type":"Domain","Name":"RetailExcellence"},"domain:OmniCom":{"Type":"Domain","Name":"OmniCom"},"domain:OmniHub":{"Type":"Domain","Name":"OmniHub"},"domain:CX":{"Type":"Domain","Name":"CX"},"domain:CE":{"Type":"Domain","Name":"CE"},"domain:ME":{"Type":"Domain","Name":"ME"},"owner:RainyGuo":{"Type":"Digital Owner","Name":"RainyGuo"},"owner:Dachuan Li":{"Type":"Digital Owner","Name":"Dachuan Li"},"owner:Lorraine Song":{"Type":"Digital Owner","Name":"Lorraine Song"},"owner:Lorraine Song ":{"Type":"Digital Owner","Name":"Lorraine Song "},"owner:Sarah Si":{"Type":"Digital Owner","Name":"Sarah Si"},"owner:Abbey Wang":{"Type":"Digital Owner","Name":"Abbey Wang"},"owner:Elaine Zhuo":{"Type":"Digital Owner","Name":"Elaine Zhuo"},"project:PR001":{"Type":"Project","Project ID":"PR001","Name":"Talkie-Voice Memo","Project Type":"ITERATION","Status":"ACTIVE","Health":"On Track","Domain":"RetailExcellence"},"project:PR018":{"Type":"Project","Project ID":"PR018","Name":"HR Talent Acquisition Agent POC","Project Type":"POC","Status":"ACTIVE","Health":"On Track","Domain":"RetailExcellence"},"project:PR019":{"Type":"Project","Project ID":"PR019","Name":"AI Shopper Analyzer POC","Project Type":"POC","Status":"ACTIVE","Health":"On Track","Domain":"RetailExcellence"},"project:PR020":{"Type":"Project","Project ID":"PR020","Name":"AI Coaching","Project Type":"ITERATION","Status":"ACTIVE","Health":"On Track","Domain":"RetailExcellence"},"project:PR021":{"Type":"Project","Project ID":"PR021","Name":"Whatsapp/Line– Asset libary","Project Type":"MVP","Status":"ACTIVE","Health":"On Track","Domain":"RetailExcellence"},"project:PR027":{"Type":"Project","Project ID":"PR027","Name":"Talkie - Image Identification","Project Type":"ITERATION","Status":"COMPLETED","Health":"On Track","Domain":"RetailExcellence"},"project:PR002":{"Type":"Project","Project ID":"PR002","Name":"One Coach Phase 1","Project Type":"MVP","Status":"ACTIVE","Health":"At Risk","Domain":"OmniCom"},"project:PR010":{"Type":"Project","Project ID":"PR010","Name":"Omni Hub Platform","Project Type":"ITERATION","Status":"ACTIVE","Health":"On Track","Domain":"OmniHub"},"project:PR011":{"Type":"Project","Project ID":"PR011","Name":"Kate Spade OMS revamp","Project Type":"MVP","Status":"ACTIVE","Health":"On Track","Domain":"OmniHub"},"project:PR012":{"Type":"Project","Project ID":"PR012","Name":"Coach TW Omni Hub","Project Type":"MVP","Status":"NOT STARTED","Health":"On Track","Domain":"OmniHub"},"project:PR017":{"Type":"Project","Project ID":"PR017","Name":"Experience Hub Phase 1 ","Project Type":"MVP","Status":"ACTIVE","Health":"On Track","Domain":"CX"},"project:PR004":{"Type":"Project","Project ID":"PR004","Name":"Experience Hub Phase 2 - Design","Project Type":"ITERATION","Status":"ACTIVE","Health":"On Track","Domain":"CX"},"project:PR005":{"Type":"Project","Project ID":"PR005","Name":"City Compass - Foundation","Project Type":"POC","Status":"ACTIVE","Health":"On Track","Domain":"CX"},"project:PR006":{"Type":"Project","Project ID":"PR006","Name":"City Compass - Assessment","Project Type":"POC","Status":"COMPLETED","Health":"On Track","Domain":"CX"},"project:PR007":{"Type":"Project","Project ID":"PR007","Name":"City Compass - Lease AI POC","Project Type":"ITERATION","Status":"ACTIVE","Health":"On Track","Domain":"CX"},"project:PR008":{"Type":"Project","Project ID":"PR008","Name":"B2B Client Portal","Project Type":"ITERATION","Status":"ACTIVE","Health":"On Track","Domain":"CX"},"project:PR009":{"Type":"Project","Project ID":"PR009","Name":"One CS Hub","Project Type":"ITERATION","Status":"ACTIVE","Health":"On Track","Domain":"CX"},"project:PR022":{"Type":"Project","Project ID":"PR022","Name":"CGE","Project Type":"MVP","Status":"ACTIVE","Health":"On Track","Domain":"CE"},"project:PR023":{"Type":"Project","Project ID":"PR023","Name":"Recommendation Studio","Project Type":"MVP","Status":"PENDING","Health":"On Track","Domain":"CE"},"project:PR024":{"Type":"Project","Project ID":"PR024","Name":"C360","Project Type":"MVP","Status":"ACTIVE","Health":"On Track","Domain":"CE"},"project:PR025":{"Type":"Project","Project ID":"PR025","Name":"DTC Performance Marketing Tracking","Project Type":"ITERATION","Status":"COMPLETED","Health":"On Track","Domain":"CE"},"project:PR033":{"Type":"Project","Project ID":"PR033","Name":"TW Loyalty Revamp","Project Type":"MVP","Status":"ACTIVE","Health":"On Track","Domain":"CE"},"project:PR028":{"Type":"Project","Project ID":"PR028","Name":"Trading Desk Phase II","Project Type":"MVP","Status":"ACTIVE","Health":"On Track","Domain":"ME"},"project:PR029":{"Type":"Project","Project ID":"PR029","Name":"City Tracking AI Interpreter","Project Type":"MVP","Status":"COMPLETED","Health":"On Track","Domain":"ME"},"project:PR030":{"Type":"Project","Project ID":"PR030","Name":"MZ Media Data performance tracking dashboard","Project Type":"MVP","Status":"ACTIVE","Health":"On Track","Domain":"ME"},"project:PR036":{"Type":"Project","Project ID":"PR036","Name":"AEO/GEO POC","Project Type":"POC","Status":"COMPLETED","Health":"On Track","Domain":"ME"},"project:PR037":{"Type":"Project","Project ID":"PR037","Name":"CORED Phase II","Project Type":"ITERATION","Status":"COMPLETED","Health":"On Track","Domain":"ME"},"capability:C019":{"Type":"Capability","Capability ID":"C019","Capability":"Talkie - Image identification\nEnable image identification and connect to official asset library with inventory","Business Value":"Empowers SAs to quickly identify product images shared by customers, locate items, check inventory, and help to drive sales conversion. ","Domain":"RetailExcellence","Digital Owner":"RainyGuo"},"capability:C020":{"Type":"Capability","Capability ID":"C020","Capability":"Talkie - Voice memo \nEnable Reminder / KOS asset recommendation ","Business Value":"Allows SAs to quickly record customer behavior and preferences after store visits, enabling targeted follow-ups to boost conversion rates.","Domain":"RetailExcellence","Digital Owner":"RainyGuo"},"capability:C004":{"Type":"Capability","Capability ID":"C004","Capability":"AI-powered SA talent acquisition POC\nComplete data collection and deliver a Mid-term report.","Business Value":"Improves the identification of high-performing Sales Associates, increasing hiring success rates in pilot markets.","Domain":"RetailExcellence","Digital Owner":"RainyGuo"},"capability:C003":{"Type":"Capability","Capability ID":"C003","Capability":"AI Coaching\nGen Z scenario & AI Coaching new version ","Business Value":"Trains SAs on Gen Z customer engagement skills, enhances sales capabilities, and elevates store experience.","Domain":"RetailExcellence","Digital Owner":"RainyGuo"},"capability:C010":{"Type":"Capability","Capability ID":"C010","Capability":"Hongkong/MacaoAsset Library - E-catalog, KOS asset & official asset with inventory","Business Value":"Enables HK/Macau stores with a fast wool to access brand asset, improving operational efficiency.","Domain":"RetailExcellence","Digital Owner":"RainyGuo"},"capability:C015":{"Type":"Capability","Capability ID":"C015","Capability":"Shopper Analysis POC\nLaunching a POC: New shopper analysis in 4 stores.","Business Value":"Try-run in 4 stores, provides accurate store traffic data and customer heat maps to track shopping behavior, offering actionable insights for the VM team to optimize in-store displays and boost customer dwell time.","Domain":"RetailExcellence","Digital Owner":"RainyGuo"},"capability:C002":{"Type":"Capability","Capability ID":"C002","Capability":"AEO/GEO Toolkit Selection and Test Run\nComplete toolkit selection and pilot test run for AEO / GEO.","Business Value":"Builds early capability in answer-engine and generative-engine optimization, helping us evaluate new opportunities for traffic and discoverability.","Domain":"OmniCom","Digital Owner":"Dachuan Li"},"capability:C013":{"Type":"Capability","Capability ID":"C013","Capability":"OneCoach MVP\nDeliver the OneCoach MVP for both mini program and website.","Business Value":"Establishes the core OneCoach experience across key owned channels and supports a more consistent omni-channel customer journey.","Domain":"OmniCom","Digital Owner":"Dachuan Li"},"capability:C014":{"Type":"Capability","Capability ID":"C014","Capability":"Product Knowledge Base for Tmall AI Selling Assistant.\nBuild the product knowledge base to power the Tmall AI Selling Assistant.","Business Value":"Improves AI-assisted selling quality and enables more accurate, scalable product recommendations and customer support.","Domain":"OmniCom","Digital Owner":"Dachuan Li"},"capability:C008":{"Type":"Capability","Capability ID":"C008","Capability":"E-Club AI Agent\nLaunch the E-Club AI Agent capability.","Business Value":"Enhances employee experience and validates AI agent use cases in internal business scenarios.","Domain":"OmniCom","Digital Owner":"Dachuan Li"},"capability:C018":{"Type":"Capability","Capability ID":"C018","Capability":"Taiwan EC Short-term Improvements\nDeliver short-term improvement items for Taiwan EC.","Business Value":"Drives near-term business impact by improving site experience and supporting commercial performance in Taiwan.","Domain":"OmniCom","Digital Owner":"Dachuan Li"},"capability:C023":{"Type":"Capability","Capability ID":"C023","Capability":"Scope: Complete system architecture transformation of KS OMS and realize docking with core business systems","Business Value":"","Domain":"OmniHub","Digital Owner":""},"capability:C024":{"Type":"Capability","Capability ID":"C024","Capability":"Research and Business Design","Business Value":"","Domain":"OmniHub","Digital Owner":""},"capability:C025":{"Type":"Capability","Capability ID":"C025","Capability":"Optimize inventory reconciliation and settlement logic in OMNI HUB platform","Business Value":"","Domain":"OmniHub","Digital Owner":""},"capability:C026":{"Type":"Capability","Capability ID":"C026","Capability":"Develop/Integration data dashboard for StoreView business module","Business Value":"","Domain":"OmniHub","Digital Owner":""},"capability:C005":{"Type":"Capability","Capability ID":"C005","Capability":"City & Store Compass - Leasing & Store Data\nUtilize AI capability to extract the key leasing information from different types of contracts and consolidate the right information to the right team","Business Value":"Improve the overall business working efficiency and accuracy in leasing data management and set-up a solid foundation for the overall city & store compass ","Domain":"CX","Digital Owner":"Lorraine Song"},"capability:C022":{"Type":"Capability","Capability ID":"C022","Capability":"Wholesale Sale-in Portal\nStreamline and digitalize the entire sell-in process","Business Value":"Improve the working efficiency of the sell-in process; mitigate the OOS opportunity USD560K currently we have due to mis allocation of product inventory & provide more visibility to clients for better business partnership and collaboration","Domain":"CX","Digital Owner":"Lorraine Song "},"capability:C012":{"Type":"Capability","Capability ID":"C012","Capability":"New 400 Vendor onboarding\nAssist business to migrate multi-region hotline numbers and customer service teams with system configuration and data support for seamless transition.","Business Value":"EnablerConnect online and offline core touchpoints to achieve seamless coordination of services, ensuring users receive consistent, efficient, and personalized service across all channels","Domain":"CX","Digital Owner":"Lorraine Song "},"capability:C016":{"Type":"Capability","Capability ID":"C016","Capability":"Store Inquiry AI robot\nIntegrate an AI robot to recognize the store related queries (70% of total service interaction) and reply to users in real-time manner","Business Value":"Reduce the manual efforts of handling of store related queries by 60%","Domain":"CX","Digital Owner":"Lorraine Song "},"capability:C009":{"Type":"Capability","Capability ID":"C009","Capability":"Experience Hub MVP\nLaunch the MVP version of repair service to digitalize the overall process in the store with better interaction with repair center","Business Value":"Fully digitalize the user journey in store and improve the repair service order process efficiency by 20% in MVP versionImprove customer satisfaction and target to have membership acquisition opportunity in the process","Domain":"CX","Digital Owner":"Lorraine Song "},"capability:C007":{"Type":"Capability","Capability ID":"C007","Capability":"DTC Demand Capture Data integrated with DataWorks\nEnable automated Cross-Platform Performance Marketing Scorecard Tracking in AliCloud.","Business Value":"Ensures transparency and visibility of marketing performance of multiple channel including Tiktok,Tmall,JD and WeChat on \"One-Stop\" Executive Dashboard.","Domain":"CE","Digital Owner":"Sarah Si"},"capability:C017":{"Type":"Capability","Capability ID":"C017","Capability":"TW Loyalty Revamp\nAccomplish TW VIP revamp","Business Value":"Update the existing TW loyalty program to mirror the successful new mechanism implemented in CN market, establishing a unified, emotionally engaging, and seamless loyalty journey for all customers in the region.","Domain":"CE","Digital Owner":"Sarah Si"},"capability:C029":{"Type":"Capability","Capability ID":"C029","Capability":"revamp existing CDP&MA system to setup agentic platform: foundation setup","Business Value":"1. scaling addressable consumer base by enrichment\n2. enable scalable and personalized engagement during D0 and D7 to boost conversion rate","Domain":"CE","Digital Owner":"Sarah Si"},"capability:C030":{"Type":"Capability","Capability ID":"C030","Capability":"360-degree performance model that enable deep understanding of GenZ segmentation","Business Value":"qualified data common layer to support BA to conduct analysis and to support regular report for leadership","Domain":"CE","Digital Owner":"Sarah Si"},"capability:C001":{"Type":"Capability","Capability ID":"C001","Capability":"AEO/GEO\n1. Query & Intent Coverage Analysis: understand key consumer queries & intents, and identify content priorities for AEO/GEO2. AI Visibility Assessment: assess the current status of content being retrieved and used in AI-generated answers3. Content Structure & Quality Diagnostics: analyze content structure and quality (e.g., format, completeness, clarity) so as to understand whether the content meets AI-readiness standards4. AI-driven Optimization Recommendations: AI-generated recommendations for content optimization to improve AI discoverability","Business Value":"Ensure the brand is accurately discovered and surfaced in answer-based search environments- Enhance brand visibility and credibility within AI ecosystems, improving brand presence in AI search","Domain":"ME","Digital Owner":"Abbey Wang"},"capability:C011":{"Type":"Capability","Capability ID":"C011","Capability":"Marketing hub-MZ Meida Data Reports\nIntegrate MZ media data and store it in dataworks to support various types of insights and weekly reports.\n\n\n\n","Business Value":"Unified media data management and processing enable more granular media data analysis, as well as precise attribution and business optimization.","Domain":"ME","Digital Owner":"Elaine Zhuo"},"capability:C021":{"Type":"Capability","Capability ID":"C021","Capability":"Trading Desk Phase 2\nEstablish cross- platform AD data integration and analysis, AD materials management","Business Value":"Double AD excution efficiency, full integrate Rednote AD data, and enable timely ,in-depth analysis for data-driven decision-making and improved maketing performance.","Domain":"ME","Digital Owner":"Elaine Zhuo"},"capability:C006":{"Type":"Capability","Capability ID":"C006","Capability":"City tracking AI interpreter\nLaunch AI interpreter in city strategy dashboard via portal integration","Business Value":"Unified portal access and consistent AI interpretation logic eliminate discrepancies in data caliber and analysis methods across departments, deliver standardized insights, reduce communication costs, and ensure aligned progress in the implementation of city strategies.","Domain":"ME","Digital Owner":"Elaine Zhuo"},"capability:C031":{"Type":"Capability","Capability ID":"C031","Capability":"Build CORED as an AI-driven Content Operations & Consumer Insight Engine, enabling: precise campaign execution + scalable content production + insight-driven optimization","Business Value":"Improve SA/KOS social productivity and performnce\n","Domain":"ME","Digital Owner":"Abbey Wang"}}}
+</script>
+
+<script>
+(function() {
+  var DATA = JSON.parse(document.getElementById("graph-data").textContent);
+  var COLORS = {
+    "category": {fill:"#10b981", bg:"rgba(16,185,129,0.15)", stroke:"#10b981"},
+    "person": {fill:"#f59e0b", bg:"rgba(245,158,11,0.15)", stroke:"#f59e0b"},
+    "item": {fill:"#60a5fa", bg:"rgba(96,165,250,0.15)", stroke:"#60a5fa"},
+    "tag": {fill:"#a78bfa", bg:"rgba(167,139,250,0.15)", stroke:"#a78bfa"}
+  };
+  var EDGE_COLORS = {
+    "belongs_to_domain": "rgba(16,185,129,0.25)",
+    "has_capability": "rgba(167,139,250,0.25)",
+    "owned_by": "rgba(245,158,11,0.25)"
+  };
+  var EDGE_WIDTHS = {
+    "belongs_to_domain": 1.2,
+    "has_capability": 1.2,
+    "owned_by": 1.2
+  };
+  var EDGE_DASH_SET = ["owned_by"];
+  var RADII = {
+    "category": 28,
+    "person": 20,
+    "item": 22,
+    "tag": 18
+  };
+  var LABEL_MAX = {
+    "category": 34,
+    "person": 24,
+    "item": 26,
+    "tag": 22
+  };
+  var FILTER_TYPE = "category";
+  var FIRST_TYPE = "category";
+
+  function getRadius(d) { return d.r || RADII[d.type] || 16; }
+
+  var width = window.innerWidth, height = window.innerHeight;
+  var showLabels = true, activeFilter = null, wasDragged = false;
+
+  var svg = d3.select("#graph");
+  var g = svg.append("g");
+  var tooltipEl = document.getElementById("tooltip");
+  var panel = document.getElementById("detailPanel");
+
+  var zoomBehavior = d3.zoom().scaleExtent([0.15, 4]).on("zoom", function(ev) {
+    g.attr("transform", ev.transform);
+  });
+  svg.call(zoomBehavior);
+
+  var adjacency = {};
+  DATA.nodes.forEach(function(n) { adjacency[n.id] = new Set(); });
+  DATA.edges.forEach(function(e) {
+    if (adjacency[e.source]) adjacency[e.source].add(e.target);
+    if (adjacency[e.target]) adjacency[e.target].add(e.source);
+  });
+
+  var simulation = d3.forceSimulation(DATA.nodes)
+    .force("link", d3.forceLink(DATA.edges).id(function(d){return d.id}).distance(120).strength(0.4))
+    .force("charge", d3.forceManyBody().strength(function(d){
+      var r = getRadius(d);
+      return r >= 28 ? -600 : r >= 20 ? -400 : -200;
+    }))
+    .force("center", d3.forceCenter(width/2, height/2))
+    .force("collision", d3.forceCollide().radius(function(d){return getRadius(d)+8}))
+    .force("x", d3.forceX(width/2).strength(0.03))
+    .force("y", d3.forceY(height/2).strength(0.03));
+
+  var link = g.append("g").selectAll("line").data(DATA.edges).enter().append("line")
+    .attr("stroke", function(d){return EDGE_COLORS[d.type]||"rgba(100,116,139,0.15)"})
+    .attr("stroke-width", function(d){return EDGE_WIDTHS[d.type]||1.2})
+    .attr("stroke-dasharray", function(d){return EDGE_DASH_SET.indexOf(d.type)!==-1?"4,4":"none"});
+
+  var node = g.append("g").selectAll("g").data(DATA.nodes).enter().append("g")
+    .attr("cursor","pointer")
+    .call(d3.drag()
+      .on("start", function(ev,d){ if(!ev.active) simulation.alphaTarget(0.3).restart(); d.fx=d.x; d.fy=d.y; wasDragged=false; })
+      .on("drag", function(ev,d){ d.fx=ev.x; d.fy=ev.y; wasDragged=true; })
+      .on("end", function(ev,d){ if(!ev.active) simulation.alphaTarget(0); d.fx=null; d.fy=null; })
+    );
+
+  node.append("circle").attr("r", function(d){return getRadius(d)+6})
+    .attr("fill", function(d){return (COLORS[d.type]||COLORS[FIRST_TYPE]).bg}).attr("opacity",0.5).attr("class","glow");
+  node.append("circle").attr("r", function(d){return getRadius(d)})
+    .attr("fill", function(d){return (COLORS[d.type]||COLORS[FIRST_TYPE]).bg})
+    .attr("stroke", function(d){return (COLORS[d.type]||COLORS[FIRST_TYPE]).stroke})
+    .attr("stroke-width", function(d){return getRadius(d)>=28?2.5:getRadius(d)>=20?2:1.5})
+    .attr("class","main-circle");
+  node.append("text")
+    .text(function(d){
+      var mx = LABEL_MAX[d.type]||18;
+      return d.label.length>mx ? d.label.slice(0,mx)+"..." : d.label;
+    })
+    .attr("text-anchor","middle").attr("dy", function(d){return getRadius(d)+14})
+    .attr("font-size", function(d){return getRadius(d)>=28?12:getRadius(d)>=20?11:10})
+    .attr("fill", function(d){return (COLORS[d.type]||COLORS[FIRST_TYPE]).fill})
+    .attr("font-weight", function(d){return getRadius(d)>=20?600:400})
+    .attr("opacity",0.85).attr("class","node-label").attr("pointer-events","none");
+  node.filter(function(d){return !!d.shortId}).append("text")
+    .text(function(d){return d.shortId})
+    .attr("text-anchor","middle").attr("dy",4)
+    .attr("font-size",8).attr("fill", function(d){return (COLORS[d.type]||COLORS[FIRST_TYPE]).fill})
+    .attr("font-weight",700).attr("opacity",0.9).attr("pointer-events","none");
+
+  function highlightConnected(d) {
+    var connected = adjacency[d.id] || new Set();
+    node.select(".main-circle").attr("opacity", function(n){return n.id===d.id||connected.has(n.id)?1:0.15});
+    node.select(".glow").attr("opacity", function(n){return n.id===d.id||connected.has(n.id)?0.6:0.05});
+    node.selectAll(".node-label").attr("opacity", function(n){return n.id===d.id||connected.has(n.id)?1:0.1});
+    link.attr("opacity", function(l){
+      var s=typeof l.source==="object"?l.source.id:l.source;
+      var t=typeof l.target==="object"?l.target.id:l.target;
+      return s===d.id||t===d.id?1:0.05;
+    }).attr("stroke-width", function(l){
+      var s=typeof l.source==="object"?l.source.id:l.source;
+      var t=typeof l.target==="object"?l.target.id:l.target;
+      return s===d.id||t===d.id?3:(EDGE_WIDTHS[l.type]||1.2);
+    });
+  }
+
+  function clearHighlight() {
+    activeFilter = null;
+    node.select(".main-circle").attr("opacity",1);
+    node.select(".glow").attr("opacity",0.5);
+    node.selectAll(".node-label").attr("opacity", showLabels?0.85:0);
+    link.attr("opacity",1).attr("stroke-width", function(d){return EDGE_WIDTHS[d.type]||1.2});
+  }
+
+  function highlightType(type) {
+    activeFilter = type;
+    node.select(".main-circle").attr("opacity", function(d){return d.type===type?1:0.1});
+    node.select(".glow").attr("opacity", function(d){return d.type===type?0.6:0.03});
+    node.selectAll(".node-label").attr("opacity", function(d){return d.type===type?1:0.08});
+    link.attr("opacity",0.05).attr("stroke-width",1);
+  }
+
+  function escapeHtml(s) {
+    if (!s) return "";
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  }
+
+  function showDetail(d) {
+    var det = DATA.details[d.id] || {};
+    var c = COLORS[d.type] || COLORS[FIRST_TYPE];
+    var html = "<div class=\"detail-header\">";
+    html += "<div class=\"type-badge\" style=\"background:"+c.bg+";color:"+c.fill+"\">"+escapeHtml(det.Type||d.type)+"</div>";
+    html += "<h2>"+escapeHtml(d.label)+"</h2></div>";
+    html += "<div class=\"detail-body\">";
+    var keys = Object.keys(det);
+    for (var i=0; i<keys.length; i++) {
+      var k = keys[i];
+      if (k === "Type") continue;
+      var v = det[k];
+      var isEmpty = !v || v==="nan" || v==="" || v==="None";
+      html += "<div class=\"detail-row\"><div class=\"label\">"+escapeHtml(k)+"</div>";
+      html += "<div class=\"value"+(isEmpty?" empty":"")+"\">"+(isEmpty?"N/A":escapeHtml(v))+"</div></div>";
+    }
+    var related = [];
+    DATA.edges.forEach(function(e){
+      var s=typeof e.source==="object"?e.source.id:e.source;
+      var t=typeof e.target==="object"?e.target.id:e.target;
+      if(s===d.id){ var n=DATA.nodes.find(function(x){return x.id===t}); if(n) related.push(n); }
+      if(t===d.id){ var n2=DATA.nodes.find(function(x){return x.id===s}); if(n2) related.push(n2); }
+    });
+    if(related.length) {
+      html += "<div class=\"related-section\"><h3>Connected Nodes ("+related.length+")</h3>";
+      var grouped = {};
+      related.forEach(function(r){ if(!grouped[r.type]) grouped[r.type]=[]; grouped[r.type].push(r); });
+      var types = Object.keys(grouped);
+      for(var ti=0; ti<types.length; ti++){
+        var type = types[ti];
+        var lc = COLORS[type] || COLORS[FIRST_TYPE];
+        var items = grouped[type];
+        for(var ii=0; ii<items.length; ii++){
+          var item = items[ii];
+          html += "<span class=\"related-chip\" data-node-id=\""+escapeHtml(item.id)+"\"";
+          html += " style=\"background:"+lc.bg+";border-color:"+lc.stroke+"40;color:"+lc.fill+"\">";
+          html += escapeHtml(item.label)+"</span>";
+        }
+      }
+      html += "</div>";
+    }
+    html += "</div>";
+    document.getElementById("detailContent").innerHTML = html;
+    panel.classList.add("open");
+    var chips = document.querySelectorAll(".related-chip");
+    chips.forEach(function(chip){
+      chip.addEventListener("click", function(){ focusNode(chip.getAttribute("data-node-id")); });
+    });
+  }
+
+  function closePanel() { panel.classList.remove("open"); }
+
+  function focusNode(id) {
+    var n = DATA.nodes.find(function(x){return x.id===id});
+    if(!n) return;
+    showDetail(n);
+    highlightConnected(n);
+    var transform = d3.zoomTransform(svg.node());
+    var tx = width/2 - n.x*transform.k;
+    var ty = height/2 - n.y*transform.k;
+    svg.transition().duration(500).call(zoomBehavior.transform, d3.zoomIdentity.translate(tx,ty).scale(transform.k));
+  }
+
+  node.on("mouseover", function(ev, d){
+    var det = DATA.details[d.id] || {};
+    var c = COLORS[d.type] || COLORS[FIRST_TYPE];
+    var tip = "<strong style=\"color:"+c.fill+"\">"+escapeHtml(d.label)+"</strong>";
+    var keys = Object.keys(det);
+    for(var i=0; i<Math.min(keys.length,3); i++){
+      if(keys[i]==="Type") continue;
+      tip += "<br><span style=\"color:#64748b\">"+escapeHtml(keys[i])+":</span> "+escapeHtml(String(det[keys[i]]).substring(0,60));
+    }
+    tooltipEl.innerHTML = tip;
+    tooltipEl.style.opacity = "1";
+    tooltipEl.style.left = (ev.clientX+16)+"px";
+    tooltipEl.style.top = (ev.clientY-10)+"px";
+    highlightConnected(d);
+  })
+  .on("mousemove", function(ev){
+    tooltipEl.style.left = (ev.clientX+16)+"px";
+    tooltipEl.style.top = (ev.clientY-10)+"px";
+  })
+  .on("mouseout", function(){
+    tooltipEl.style.opacity = "0";
+    if(!activeFilter) clearHighlight();
+  })
+  .on("click", function(ev, d){
+    ev.stopPropagation();
+    if(wasDragged) return;
+    showDetail(d);
+  });
+
+  svg.on("click", function(){ closePanel(); });
+
+  document.getElementById("closeBtn").addEventListener("click", closePanel);
+  document.getElementById("btnReset").addEventListener("click", function(){
+    svg.transition().duration(600).call(zoomBehavior.transform, d3.zoomIdentity);
+  });
+  document.getElementById("btnLabels").addEventListener("click", function(){
+    showLabels = !showLabels;
+    this.classList.toggle("active");
+    node.selectAll(".node-label").attr("opacity", showLabels?0.85:0);
+  });
+
+  var typeBtns = document.querySelectorAll(".controls button[data-type]");
+  typeBtns.forEach(function(btn){
+    btn.addEventListener("click", function(){ highlightType(btn.getAttribute("data-type")); });
+  });
+  document.getElementById("btnAll").addEventListener("click", clearHighlight);
+
+  var filterNodes = DATA.nodes.filter(function(n){return n.type===FILTER_TYPE});
+  var filterBar = document.getElementById("filterBar");
+  var fc = COLORS[FILTER_TYPE] || COLORS[FIRST_TYPE];
+  filterNodes.forEach(function(dn){
+    var chip = document.createElement("div");
+    chip.className = "filter-chip";
+    chip.style.background = fc.bg;
+    chip.style.borderColor = fc.stroke + "40";
+    chip.style.color = fc.fill;
+    chip.textContent = dn.label;
+    chip.addEventListener("click", function(){ highlightConnected(dn); showDetail(dn); });
+    filterBar.appendChild(chip);
+  });
+
+  simulation.on("tick", function(){
+    link.attr("x1",function(d){return d.source.x}).attr("y1",function(d){return d.source.y})
+        .attr("x2",function(d){return d.target.x}).attr("y2",function(d){return d.target.y});
+    node.attr("transform", function(d){return "translate("+d.x+","+d.y+")"});
+  });
+
+  setTimeout(function(){
+    var bounds = g.node().getBBox();
+    if(bounds.width===0) return;
+    var scale = Math.min(0.85, 0.85/Math.max(bounds.width/width, bounds.height/height));
+    var tx = width/2 - scale*(bounds.x+bounds.width/2);
+    var ty = height/2 - scale*(bounds.y+bounds.height/2);
+    svg.transition().duration(800).call(zoomBehavior.transform, d3.zoomIdentity.translate(tx,ty).scale(scale));
+  }, 2500);
+
+})();
+</script>
+</body>
+</html>

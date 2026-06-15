@@ -23,3 +23,6 @@ build/
 # VS Code
 
 .vscode/*
+
+# stories
+stories/

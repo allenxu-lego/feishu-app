@@ -13,6 +13,17 @@ on:
     # 所以 01:00 UTC = 09:00 CST
     - cron: '0 1 * * *'
 
+# 设置 GITHUB_TOKEN 的权限以允许部署到 GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 允许一个并发部署
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
   sync-data:
     runs-on: ubuntu-latest
@@ -23,7 +34,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # 使用最新的 LTS 版本
+          node-version: '24' # 使用最新的 LTS 版本
 
       - name: Install dependencies
         run: npm install node-fetch # 安装 fetch 依赖
@@ -33,3 +44,20 @@ jobs:
           FS_APP_ID: ${{ secrets.FS_APP_ID }}
           FS_APP_SECRET: ${{ secrets.FS_APP_SECRET }}
         run: node scripts/feishu_sync.js
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./docs/dynamic
+
+  deploy-pages:
+    needs: sync-data
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
