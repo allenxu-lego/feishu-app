@@ -1,0 +1,28 @@
+{
+  "name": "feishu-bitable-sync",
+  "version": "1.0.0",
+  "description": "Sync data to Feishu Bitable via GitHub Actions or local run",
+  "type": "module",
+  "scripts": {
+    "sync": "node scripts/feishu_sync.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "node-fetch": "^3.3.2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/allenxu-lego/tapestry-works.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/allenxu-lego/tapestry-works/issues"
+  },
+  "homepage": "https://github.com/allenxu-lego/tapestry-works#readme"
+}

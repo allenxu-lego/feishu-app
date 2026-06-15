@@ -1,0 +1,35 @@
+# .github/workflows/feishu-sync.yml
+name: Feishu Bitable Sync
+
+on:
+  # 允许你手动在 GitHub 页面上点击运行
+  workflow_dispatch:
+
+  # 定时触发
+  schedule:
+    # Cron 表达式：分钟 小时 日 月 星期
+    # 示例：每天北京时间上午 9:00 运行
+    # GitHub Actions 使用的是 UTC 时间，北京时间是 UTC+8
+    # 所以 01:00 UTC = 09:00 CST
+    - cron: '0 1 * * *'
+
+jobs:
+  sync-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # 使用最新的 LTS 版本
+
+      - name: Install dependencies
+        run: npm install node-fetch # 安装 fetch 依赖
+
+      - name: Run Sync Script
+        env:
+          FS_APP_ID: ${{ secrets.FS_APP_ID }}
+          FS_APP_SECRET: ${{ secrets.FS_APP_SECRET }}
+        run: node scripts/feishu_sync.js

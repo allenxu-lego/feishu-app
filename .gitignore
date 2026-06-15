@@ -1,0 +1,25 @@
+# Local env
+
+.env
+
+# Dependencies
+
+node_modules/
+
+# Logs
+
+npm-debug.log*
+yarn-error.log*
+
+# Build artifacts
+
+dist/
+build/
+
+# Claude Code
+
+.claude/*
+
+# VS Code
+
+.vscode/*
