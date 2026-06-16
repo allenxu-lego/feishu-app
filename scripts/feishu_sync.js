@@ -143,17 +143,17 @@ async function fetchCapabilities(token) {
   // 安全提取文本的辅助函数 - 支持字符串和数组两种格式
   const safeExtractText = (field) => {
     if (typeof field === 'string') {
-      return field;
+      return field.trim();
     }
     if (Array.isArray(field)) {
       return field.map(item => {
         if (item && typeof item === 'object') {
-          return item.text || '';
+          return (item.text || '').trim();
         }
-        return String(item || '');
+        return String(item || '').trim();
       }).filter(Boolean).join('\n');
     }
-    return String(field || '');
+    return String(field || '').trim();
   };
 
   const capabilities = items.map(item => ({
