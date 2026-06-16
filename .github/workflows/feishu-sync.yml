@@ -64,3 +64,52 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
+      - name: Send Adaptive Card to Teams
+        env:
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}/project-capability-graph.html
+        run: |
+          curl -X POST "${TEAMS_WEBHOOK_URL}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "type": "AdaptiveCard",
+              "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+              "version": "1.4",
+              "body": [
+                {
+                  "type": "TextBlock",
+                  "size": "Large",
+                  "weight": "Bolder",
+                  "text": "🚀 Project & Capability Knowledge"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "Check out the details of the project & capability knowledge graph!",
+                  "wrap": true,
+                  "spacing": "Medium"
+                },
+                {
+                  "type": "FactSet",
+                  "facts": [
+                    {
+                      "title": "Updated At:",
+                      "value": "'"$(date -u +"%Y-%m-%d %H:%M:%S UTC")"'"
+                    },
+                    {
+                      "title": "Status:",
+                      "value": "✅ Success"
+                    }
+                  ],
+                  "spacing": "Medium"
+                }
+              ],
+              "actions": [
+                {
+                  "type": "Action.OpenUrl",
+                  "title": "Click to view",
+                  "url": "'"${PAGE_URL}"'"
+                }
+              ]
+            }'
+        shell: bash
+
